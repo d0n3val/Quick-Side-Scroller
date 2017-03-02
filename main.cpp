@@ -124,38 +124,38 @@ void Finish()
 // ----------------------------------------------------------------
 bool CheckInput()
 {
+	bool ret = true;
 	SDL_Event event;
 
 	while(SDL_PollEvent(&event) != 0)
 	{
-		if (event.type == SDL_QUIT)
-			return false;
-
-		if(event.type == SDL_KEYUP && event.key.repeat == 0)
+		if(event.type == SDL_KEYUP)
 		{
 			switch(event.key.keysym.sym)
 			{
-				case SDLK_ESCAPE: return false; break;
 				case SDLK_UP: g.up = false;	break;
 				case SDLK_DOWN:	g.down = false;	break;
 				case SDLK_LEFT:	g.left = false;	break;
 				case SDLK_RIGHT: g.right = false; break;
 			}
 		}
-		if(event.type == SDL_KEYDOWN && event.key.repeat == 0)
+		else if(event.type == SDL_KEYDOWN)
 		{
 			switch(event.key.keysym.sym)
 			{
-				case SDLK_SPACE: g.fire = true;	break;
 				case SDLK_UP: g.up = true; break;
 				case SDLK_DOWN: g.down = true; break;
 				case SDLK_LEFT: g.left = true; break;
 				case SDLK_RIGHT: g.right = true; break;
+				case SDLK_ESCAPE: ret = false; break;
+				case SDLK_SPACE: g.fire = (event.key.repeat == 0); break;
 			}
 		}
+		else if (event.type == SDL_QUIT)
+			ret = false;
 	}
 
-	return true;
+	return ret;
 }
 
 // ----------------------------------------------------------------
@@ -178,7 +178,7 @@ void MoveStuff()
 		g.shots[g.last_shot].alive = true;
 		g.shots[g.last_shot].x = g.ship_x + 32;
 		g.shots[g.last_shot].y = g.ship_y;
-		g.last_shot++;
+		++g.last_shot;
 	}
 
 	for(int i = 0; i < NUM_SHOTS; ++i)
@@ -203,32 +203,22 @@ void Draw()
 	if(g.scroll >= g.background_width)
 		g.scroll = 0;
 
-	target.x = -g.scroll;
-	target.y = 0;
-	target.w = g.background_width;
-	target.h = SCREEN_HEIGHT;
-
+	target = { -g.scroll, 0, g.background_width, SCREEN_HEIGHT };
+	
 	SDL_RenderCopy(g.renderer, g.background, nullptr, &target);
 	target.x += g.background_width;
 	SDL_RenderCopy(g.renderer, g.background, nullptr, &target);
 
 	// Draw player's ship --
-	target.x = g.ship_x;
-	target.y = g.ship_y;
-	target.w = 64;
-	target.h = 64;
+	target = { g.ship_x, g.ship_y, 64, 64 };
 	SDL_RenderCopy(g.renderer, g.ship, nullptr, &target);
 
 	// Draw lasers --
-	target.w = 64;
-	target.h = 64;
-
 	for(int i = 0; i < NUM_SHOTS; ++i)
 	{
 		if(g.shots[i].alive)
 		{
-			target.x = g.shots[i].x;
-			target.y = g.shots[i].y;
+			target = { g.shots[i].x, g.shots[i].y, 64, 64 };
 			SDL_RenderCopy(g.renderer, g.shot, nullptr, &target);
 		}
 	}
