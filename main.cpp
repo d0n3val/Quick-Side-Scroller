@@ -110,11 +110,12 @@ void Start()
 void Finish()
 {
 	Mix_FreeMusic(g.music);
+	Mix_FreeChunk(g.fx_shoot);
 	Mix_CloseAudio();
 	Mix_Quit();
-	SDL_DestroyTexture(g.background);
-	SDL_DestroyTexture(g.ship);
 	SDL_DestroyTexture(g.shot);
+	SDL_DestroyTexture(g.ship);
+	SDL_DestroyTexture(g.background);
 	IMG_Quit();
 	SDL_DestroyRenderer(g.renderer);
 	SDL_DestroyWindow(g.window);
