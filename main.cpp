@@ -15,8 +15,8 @@
 #pragma comment( lib, "SDL_mixer/libx86/SDL2_mixer.lib" )
 
 // Globals --------------------------------------------------------
-#define SCREEN_WIDTH 1024
-#define SCREEN_HEIGHT 768
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
 #define SCROLL_SPEED 5
 #define SHIP_SPEED 3
 #define NUM_SHOTS 32
