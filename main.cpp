@@ -36,8 +36,6 @@
 // 
 // ----------------------------------------------------------------
 
-#include "stdlib.h"
-
 #include "SDL\include\SDL.h"
 #include "SDL_image\include\SDL_image.h"
 #include "SDL_mixer\include\SDL_mixer.h"
@@ -63,45 +61,37 @@ struct projectile
 
 struct globals
 {
-	SDL_Window* window;
-	SDL_Surface* w_surface;
-	SDL_Renderer* renderer;
-	SDL_Texture* background;
-	int background_width;
-	SDL_Texture* ship;
-	int ship_x;
-	int ship_y;
-	SDL_Texture* shot;
-	projectile shots[NUM_SHOTS];
-	int last_shot;
+	SDL_Window* window = nullptr;
+	SDL_Renderer* renderer = nullptr;
+	SDL_Texture* background = nullptr;
+	SDL_Texture* ship = nullptr;
+	SDL_Texture* shot = nullptr;
+	int background_width = 0;
+	int ship_x = 0;
+	int ship_y = 0;
+	int last_shot = 0;
 	bool fire, up, down, left, right;
-	const Uint8 *keys;
-	Mix_Music* music;
-	Mix_Chunk* fx_shoot;
-	int scroll;
-};
-
-globals g;
+	Mix_Music* music = nullptr;
+	Mix_Chunk* fx_shoot = nullptr;
+	int scroll = 0;
+	projectile shots[NUM_SHOTS];
+} g; // automatically create an insteance called "g"
 
 // ----------------------------------------------------------------
 void Start()
 {
 	SDL_Init(SDL_INIT_EVERYTHING);
 
-	// Create window --
-	g.window = SDL_CreateWindow("QSS - Quick Side Scroller - 0.5", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
-	g.w_surface = SDL_GetWindowSurface(g.window);
-
-	// Create renderer --
+	// Create window & renderer
+	g.window = SDL_CreateWindow("QSS - Quick Side Scroller - 0.5", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
 	g.renderer = SDL_CreateRenderer(g.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	SDL_SetRenderDrawColor(g.renderer, 0, 0, 0, 255);
 
 	// Load image lib --
 	IMG_Init(IMG_INIT_PNG);
 	g.background = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("assets/background.png"));
 	g.ship = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("assets/ship.png"));
 	g.shot = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("assets/shot.png"));
-	SDL_QueryTexture(g.background, NULL, NULL, &g.background_width, NULL);
+	SDL_QueryTexture(g.background, nullptr, nullptr, &g.background_width, nullptr);
 
 	// Create mixer --
 	Mix_Init(MIX_INIT_OGG);
@@ -111,11 +101,9 @@ void Start()
 	g.fx_shoot = Mix_LoadWAV("assets/laser.wav");
 
 	// Init other vars --
-	g.scroll = 0;
 	g.ship_x = 100;
 	g.ship_y = SCREEN_HEIGHT / 2;
 	g.fire = g.up = g.down = g.left = g.right = false;
-	g.last_shot = 0;
 }
 
 // ----------------------------------------------------------------
@@ -126,6 +114,7 @@ void Finish()
 	Mix_Quit();
 	SDL_DestroyTexture(g.background);
 	SDL_DestroyTexture(g.ship);
+	SDL_DestroyTexture(g.shot);
 	IMG_Quit();
 	SDL_DestroyRenderer(g.renderer);
 	SDL_DestroyWindow(g.window);
@@ -173,14 +162,10 @@ bool CheckInput()
 void MoveStuff()
 {
 	// Calc new ship position
-	if(g.up)
-		g.ship_y -= SHIP_SPEED;
-	if(g.down)
-		g.ship_y += SHIP_SPEED;
-	if(g.left)
-		g.ship_x -= SHIP_SPEED;
-	if(g.right)
-		g.ship_x += SHIP_SPEED;
+	if(g.up) g.ship_y -= SHIP_SPEED;
+	if(g.down) g.ship_y += SHIP_SPEED;
+	if(g.left) g.ship_x -= SHIP_SPEED;
+	if(g.right)	g.ship_x += SHIP_SPEED;
 
 	if(g.fire)
 	{
@@ -211,13 +196,9 @@ void MoveStuff()
 // ----------------------------------------------------------------
 void Draw()
 {
-	// Clear screen to black
-	SDL_RenderClear(g.renderer);
-
 	SDL_Rect target;
 
-	// Pintem el fons amb scroll --
-
+	// Scroll and draw background
 	g.scroll += SCROLL_SPEED;
 	if(g.scroll >= g.background_width)
 		g.scroll = 0;
@@ -227,18 +208,18 @@ void Draw()
 	target.w = g.background_width;
 	target.h = SCREEN_HEIGHT;
 
-	SDL_RenderCopy(g.renderer, g.background, NULL, &target);
+	SDL_RenderCopy(g.renderer, g.background, nullptr, &target);
 	target.x += g.background_width;
-	SDL_RenderCopy(g.renderer, g.background, NULL, &target);
+	SDL_RenderCopy(g.renderer, g.background, nullptr, &target);
 
-	// Pintem la nau --
+	// Draw player's ship --
 	target.x = g.ship_x;
 	target.y = g.ship_y;
 	target.w = 64;
 	target.h = 64;
-	SDL_RenderCopy(g.renderer, g.ship, NULL, &target);
+	SDL_RenderCopy(g.renderer, g.ship, nullptr, &target);
 
-	// Pintem els lasers --
+	// Draw lasers --
 	target.w = 64;
 	target.h = 64;
 
@@ -248,11 +229,11 @@ void Draw()
 		{
 			target.x = g.shots[i].x;
 			target.y = g.shots[i].y;
-			SDL_RenderCopy(g.renderer, g.shot, NULL, &target);
+			SDL_RenderCopy(g.renderer, g.shot, nullptr, &target);
 		}
 	}
 
-	// Finally present
+	// Finally swap buffers
 	SDL_RenderPresent(g.renderer);
 }
 
@@ -269,5 +250,5 @@ int main(int argc, char* args[])
 
 	Finish();
 
-	return(EXIT_SUCCESS);
+	return(0); // EXIT_SUCCESS
 }
