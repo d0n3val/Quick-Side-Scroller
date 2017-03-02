@@ -2,6 +2,8 @@
 
 Simplistic side scroller made with SDL for educational purposes.
 
+![screenshot](/Docs/screenshot.png)
+
 QSS is maintained at https://github.com/d0n3val/Quick-Side-Scroller
 
 ## Installation
