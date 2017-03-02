@@ -89,7 +89,7 @@ void Start()
 	SDL_Init(SDL_INIT_EVERYTHING);
 
 	// Create window --
-	g.window = SDL_CreateWindow("Super Awesome Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	g.window = SDL_CreateWindow("QSS - Quick Side Scroller - 0.5", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 	g.w_surface = SDL_GetWindowSurface(g.window);
 
 	// Create renderer --
@@ -98,17 +98,17 @@ void Start()
 
 	// Load image lib --
 	IMG_Init(IMG_INIT_PNG);
-	g.background = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("background.png"));
-	g.ship = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("ship.png"));
-	g.shot = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("shot.png"));
+	g.background = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("assets/background.png"));
+	g.ship = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("assets/ship.png"));
+	g.shot = SDL_CreateTextureFromSurface(g.renderer, IMG_Load("assets/shot.png"));
 	SDL_QueryTexture(g.background, NULL, NULL, &g.background_width, NULL);
 
 	// Create mixer --
 	Mix_Init(MIX_INIT_OGG);
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
-	g.music = Mix_LoadMUS("music.ogg");
+	g.music = Mix_LoadMUS("assets/music.ogg");
 	Mix_PlayMusic(g.music, -1);
-	g.fx_shoot = Mix_LoadWAV("laser.wav");
+	g.fx_shoot = Mix_LoadWAV("assets/laser.wav");
 
 	// Init other vars --
 	g.scroll = 0;
@@ -139,46 +139,29 @@ bool CheckInput()
 
 	while(SDL_PollEvent(&event) != 0)
 	{
+		if (event.type == SDL_QUIT)
+			return false;
+
 		if(event.type == SDL_KEYUP && event.key.repeat == 0)
 		{
 			switch(event.key.keysym.sym)
 			{
-				case SDLK_ESCAPE:
-				return false;
-				break;
-				case SDLK_UP:
-				g.up = false;
-				break;
-				case SDLK_DOWN:
-				g.down = false;
-				break;
-				case SDLK_LEFT:
-				g.left = false;
-				break;
-				case SDLK_RIGHT:
-				g.right = false;
-				break;
+				case SDLK_ESCAPE: return false; break;
+				case SDLK_UP: g.up = false;	break;
+				case SDLK_DOWN:	g.down = false;	break;
+				case SDLK_LEFT:	g.left = false;	break;
+				case SDLK_RIGHT: g.right = false; break;
 			}
 		}
 		if(event.type == SDL_KEYDOWN && event.key.repeat == 0)
 		{
 			switch(event.key.keysym.sym)
 			{
-				case SDLK_SPACE:
-				g.fire = true;
-				break;
-				case SDLK_UP:
-				g.up = true;
-				break;
-				case SDLK_DOWN:
-				g.down = true;
-				break;
-				case SDLK_LEFT:
-				g.left = true;
-				break;
-				case SDLK_RIGHT:
-				g.right = true;
-				break;
+				case SDLK_SPACE: g.fire = true;	break;
+				case SDLK_UP: g.up = true; break;
+				case SDLK_DOWN: g.down = true; break;
+				case SDLK_LEFT: g.left = true; break;
+				case SDLK_RIGHT: g.right = true; break;
 			}
 		}
 	}
