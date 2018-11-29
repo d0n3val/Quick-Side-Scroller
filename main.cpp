@@ -1,15 +1,8 @@
 // ----------------------------------------------------------------
 // Quick Side Scroller (https://github.com/d0n3val/Quick-Side-Scroller)
-// Simplistic side scroller made with SDL for learn&fun.
+// Simplistic side scroller made with SDL for learn&fun by Ricard Pillosu
 //
-// Installation
-// Project files are made for VS 2017. Download the code, compile it.
-// There is no formal installation process.
-//
-// Credits
-// Ricard Pillosu
-//
-// License
+// LICENSE
 // This is free and unencumbered software released into the public domain.
 //
 // Anyone is free to copy, modify, publish, use, compile, sell, or
@@ -34,7 +27,6 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 //
 // For more information, please refer to <http://unlicense.org/>
-// 
 // ----------------------------------------------------------------
 
 #include "SDL\include\SDL.h"
@@ -43,12 +35,13 @@
 
 // Globals for design tweaks -------------------------------------
 #define SCROLL_SPEED 2
-#define SHIP_SPEED 5
+#define SHIP_SPEED 4
 #define NUM_SHOTS 32
-#define SHOT_SPEED 10
-#define ENEMY_SPEED 4
-#define NUM_ENEMIES 10
-#define WAVE_TIMER 1000 // ms between waves
+#define SHOT_SPEED 20 
+#define ENEMY_SPEED 8
+#define NUM_ENEMIES 8
+#define WAVE_TIMER 4000 // ms between waves
+#define INTRO_TIMER 2000 // ms of invulnerability
 
 // Globals for tech tweaks -------------------------------------
 #define SCREEN_WIDTH 640
@@ -92,10 +85,12 @@ struct globals
 	int last_shot, last_enemy;
 	int fire, up, down, left, right;
 	int scroll;
-	int score;
-	float wave_timer;
+	int score, max_score;
+	int frame;
+	float wave_timer, intro_timer;
 	Mix_Music* music;
 	Mix_Chunk* fx_shoot;
+	SDL_Texture* tex_max;
 	struct
 	{
 		SDL_Texture* tex;
@@ -126,6 +121,7 @@ void Start()
 	g.ship = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "ship.png"));
 	g.shot = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "shot.png"));
 	g.tex_enemy = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "enemy.png"));
+	g.tex_max = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "max.png"));
 	g.font.tex = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "font.png"));
 	SDL_QueryTexture(g.font.tex, nullptr, nullptr, &g.font.w, &g.font.h);
 	g.font.w /= 10; // w,h are for every single letter, this font should have "0123456789"
@@ -138,9 +134,9 @@ void Start()
 	g.fx_shoot = Mix_LoadWAV(ASSETS_DIR "laser.wav");
 
 	// Init other vars --
-	g.ship_x = SCREEN_WIDTH / 6;
+	g.ship_x = -SPRITE_SIZE * 3;
 	g.ship_y = SCREEN_HEIGHT / 2;
-	g.wave_timer = SDL_GetTicks();
+	g.wave_timer = g.intro_timer = SDL_GetTicks();
 }
 
 // ----------------------------------------------------------------
@@ -156,6 +152,7 @@ void Finish()
 	SDL_DestroyTexture(g.ship);
 	SDL_DestroyTexture(g.shot);
 	SDL_DestroyTexture(g.tex_enemy);
+	SDL_DestroyTexture(g.tex_max);
 	SDL_DestroyTexture(g.font.tex);
 	IMG_Quit();
 
@@ -194,28 +191,36 @@ bool CheckInput()
 // ----------------------------------------------------------------
 void MoveStuff()
 {
-	// Calc new ship position
-	g.ship_y += (-SHIP_SPEED * g.up) + (SHIP_SPEED * g.down);
-	g.ship_x += (-SHIP_SPEED * g.left) + (SHIP_SPEED * g.right);
-
-	// Limit position to current screen
-	CAP(g.ship_y, 0, SCREEN_HEIGHT - SPRITE_SIZE);
-	CAP(g.ship_x, 0, SCREEN_WIDTH - SPRITE_SIZE);
-
-	// Check if we need to spawn a new laser --
-	if(g.fire)
+	if (g.intro_timer == 0.0f)
 	{
-		Mix_PlayChannel(-1, g.fx_shoot, 0);
-		g.fire = false;
+		// Calc new ship position
+		g.ship_y += (-SHIP_SPEED * g.up) + (SHIP_SPEED * g.down);
+		g.ship_x += (-SHIP_SPEED * g.left) + (SHIP_SPEED * g.right);
 
-		if(g.last_shot == NUM_SHOTS)
-			g.last_shot = 0;
+		// Limit position to current screen
+		CAP(g.ship_y, 0, SCREEN_HEIGHT - SPRITE_SIZE);
+		CAP(g.ship_x, 0, SCREEN_WIDTH - SPRITE_SIZE);
 
-		g.shots[g.last_shot].alive = true;
-		g.shots[g.last_shot].x = g.ship_x + SPRITE_SIZE/2;
-		g.shots[g.last_shot].y = g.ship_y;
-		++g.last_shot;
+		// Check if we need to spawn a new laser --
+		if(g.fire)
+		{
+			Mix_PlayChannel(-1, g.fx_shoot, 0);
+			g.fire = false;
+
+			if(g.last_shot == NUM_SHOTS)
+				g.last_shot = 0;
+
+			g.shots[g.last_shot].alive = true;
+			g.shots[g.last_shot].x = g.ship_x + SPRITE_SIZE/2;
+			g.shots[g.last_shot].y = g.ship_y;
+			++g.last_shot;
+		}
 	}
+	else if (SDL_GetTicks() - g.intro_timer > INTRO_TIMER)
+		g.intro_timer = 0.0f; // Cycle invulnerability timer clock 
+	else
+		g.ship_x += SHIP_SPEED;
+
 
 	// Move all lasers --
 	for(int i = 0; i < NUM_SHOTS; ++i)
@@ -233,6 +238,7 @@ void MoveStuff()
 					{
 						// we have a hit!
 						g.shots[i].alive = g.enemies[k].alive = false;
+						g.enemies[k].x = -100;
 						g.score++;
 					}
 				}
@@ -250,7 +256,7 @@ void MoveStuff()
 		{
 			g.last_enemy = 0;
 			g.wave_timer = SDL_GetTicks();
-			spawn_height = SPRITE_SIZE + (g.scroll % (SCREEN_HEIGHT-SPRITE_SIZE-SPRITE_SIZE));
+			spawn_height = SPRITE_SIZE + (g.frame % (SCREEN_HEIGHT-SPRITE_SIZE-SPRITE_SIZE));
 		}
 		else if (g.last_enemy == 0 || g.enemies[g.last_enemy-1].x < SCREEN_WIDTH-SPRITE_SIZE)
 		{
@@ -273,12 +279,15 @@ void MoveStuff()
 				g.enemies[i].y += SDL_sinf(g.enemies[i].x/(SCREEN_WIDTH/20)) * 4;
 				SDL_Rect a = {g.enemies[i].x, g.enemies[i].y, SPRITE_SIZE, SPRITE_SIZE};
 				SDL_Rect b = {g.ship_x, g.ship_y, SPRITE_SIZE, SPRITE_SIZE};
-				if (SDL_HasIntersection(&a, &b))
+				if (g.intro_timer == 0.0f && SDL_HasIntersection(&a, &b))
 				{
 					// we have been hit!
 					g.enemies[i].alive = false;
 					g.enemies[i].x = -100;
-					g.score--;
+					g.score = 0;
+					g.intro_timer = SDL_GetTicks();
+					g.ship_x = -SPRITE_SIZE * 4;
+					g.ship_y = SCREEN_HEIGHT / 2;
 				}
 			}
 			else
@@ -304,8 +313,11 @@ void Draw()
 	}
 
 	// Draw player's ship --
-	target = { g.ship_x, g.ship_y, SPRITE_SIZE, SPRITE_SIZE };
-	SDL_RenderCopy(g.renderer, g.ship, nullptr, &target);
+	if (g.intro_timer == 0.0f || g.frame % 2)
+	{
+		target = { g.ship_x, g.ship_y, SPRITE_SIZE, SPRITE_SIZE };
+		SDL_RenderCopy(g.renderer, g.ship, nullptr, &target);
+	}
 
 	// Draw lasers --
 	for(int i = 0; i < NUM_SHOTS; ++i)
@@ -328,13 +340,22 @@ void Draw()
 	}
 
 	// Draw score --
-	int num = g.score;
-	for(int i = 0; i < 5; ++i)
-	{ 
-		target = { SCREEN_WIDTH - 10 - (g.font.w*(i+1)), 10, g.font.w, g.font.h };
-		section = { (num % 10) * g.font.w, 0, g.font.w, g.font.h };
-		SDL_RenderCopy(g.renderer, g.font.tex, &section, &target);
-		num /= 10;
+	if (g.score > g.max_score)
+		g.max_score = g.score;
+
+	target = { SCREEN_WIDTH - 20 - g.font.w*8, 10, g.font.w*3, g.font.h };
+	SDL_RenderCopy(g.renderer, g.tex_max, nullptr, &target);
+
+	for (int n = 0; n < 2; ++n)
+	{
+		int num = (n ? g.score : g.max_score);
+		for (int i = 0; i < 5; ++i)
+		{
+			target = { SCREEN_WIDTH - 10 - (g.font.w*(i + 1)), 10 + ((10+g.font.h)*n), g.font.w, g.font.h };
+			section = { (num % 10) * g.font.w, 0, g.font.w, g.font.h };
+			SDL_RenderCopy(g.renderer, g.font.tex, &section, &target);
+			num /= 10;
+		}
 	}
 	
 	// Finally swap buffers --
@@ -350,6 +371,7 @@ int main(int argc, char* args[])
 	{
 		MoveStuff();
 		Draw();
+		++g.frame;
 	}
 
 	Finish();
