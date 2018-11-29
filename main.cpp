@@ -41,27 +41,33 @@
 #include "SDL_image\include\SDL_image.h"
 #include "SDL_mixer\include\SDL_mixer.h"
 
-#pragma comment( lib, "SDL/libx86/SDL2.lib" )
-#pragma comment( lib, "SDL/libx86/SDL2main.lib" )
-#pragma comment( lib, "SDL_image/libx86/SDL2_image.lib" )
-#pragma comment( lib, "SDL_mixer/libx86/SDL2_mixer.lib" )
-
-// Macros --------------------------------------------------------
-#define CAP(value, min, max) (value = (value<min) ? min : ((value>max) ? max : value));
-
-// Globals --------------------------------------------------------
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
+// Globals for design tweaks -------------------------------------
 #define SCROLL_SPEED 2
 #define SHIP_SPEED 5
 #define NUM_SHOTS 32
 #define SHOT_SPEED 10
+#define ENEMY_SPEED 4
+#define NUM_ENEMIES 10
+#define WAVE_TIMER 1000 // ms between waves
+
+// Globals for tech tweaks -------------------------------------
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
 #define SPRITE_SIZE 64
 #define NUM_LAYERS 5
 #define ASSETS_DIR "assets/"
 
+// Macros --------------------------------------------------------
+#define CAP(value, min, max) (value = (value<min) ? min : ((value>max) ? max : value));
+
 const char* tex_layers[NUM_LAYERS] = { 
 	ASSETS_DIR "bg0.png", ASSETS_DIR "bg1.png", ASSETS_DIR "bg2.png", ASSETS_DIR "bg3.png", ASSETS_DIR "fg.png" };
+
+struct enemy
+{
+	bool alive;
+	int x, y;
+};
 
 struct parallax
 {
@@ -81,20 +87,23 @@ struct globals
 	SDL_Renderer* renderer;
 	SDL_Texture* ship;
 	SDL_Texture* shot;
+	SDL_Texture* tex_enemy;
 	int ship_x, ship_y;
-	int last_shot;
+	int last_shot, last_enemy;
 	int fire, up, down, left, right;
 	int scroll;
 	int score;
+	float wave_timer;
 	Mix_Music* music;
 	Mix_Chunk* fx_shoot;
-	projectile shots[NUM_SHOTS];
-	parallax layers[NUM_LAYERS];
 	struct
 	{
 		SDL_Texture* tex;
 		int w, h;
 	} font;
+	projectile shots[NUM_SHOTS];
+	parallax layers[NUM_LAYERS];
+	enemy enemies[NUM_ENEMIES];
 } g; // automatically create an insteance called "g"
 
 // ----------------------------------------------------------------
@@ -116,6 +125,7 @@ void Start()
 	}
 	g.ship = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "ship.png"));
 	g.shot = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "shot.png"));
+	g.tex_enemy = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "enemy.png"));
 	g.font.tex = SDL_CreateTextureFromSurface(g.renderer, IMG_Load(ASSETS_DIR "font.png"));
 	SDL_QueryTexture(g.font.tex, nullptr, nullptr, &g.font.w, &g.font.h);
 	g.font.w /= 10; // w,h are for every single letter, this font should have "0123456789"
@@ -130,6 +140,7 @@ void Start()
 	// Init other vars --
 	g.ship_x = SCREEN_WIDTH / 6;
 	g.ship_y = SCREEN_HEIGHT / 2;
+	g.wave_timer = SDL_GetTicks();
 }
 
 // ----------------------------------------------------------------
@@ -144,6 +155,7 @@ void Finish()
 		SDL_DestroyTexture(g.layers[i].texture);
 	SDL_DestroyTexture(g.ship);
 	SDL_DestroyTexture(g.shot);
+	SDL_DestroyTexture(g.tex_enemy);
 	SDL_DestroyTexture(g.font.tex);
 	IMG_Quit();
 
@@ -190,9 +202,9 @@ void MoveStuff()
 	CAP(g.ship_y, 0, SCREEN_HEIGHT - SPRITE_SIZE);
 	CAP(g.ship_x, 0, SCREEN_WIDTH - SPRITE_SIZE);
 
+	// Check if we need to spawn a new laser --
 	if(g.fire)
 	{
-		g.score++;
 		Mix_PlayChannel(-1, g.fx_shoot, 0);
 		g.fire = false;
 
@@ -205,14 +217,72 @@ void MoveStuff()
 		++g.last_shot;
 	}
 
+	// Move all lasers --
 	for(int i = 0; i < NUM_SHOTS; ++i)
 	{
 		if(g.shots[i].alive)
 		{
-			if(g.shots[i].x < SCREEN_WIDTH)
+			if (g.shots[i].x < SCREEN_WIDTH)
+			{
 				g.shots[i].x += SHOT_SPEED;
+				SDL_Rect a = {g.shots[i].x, g.shots[i].y, SPRITE_SIZE, SPRITE_SIZE};
+				for (int k = 0; k < NUM_ENEMIES; ++k)
+				{
+					SDL_Rect b = {g.enemies[k].x, g.enemies[k].y, SPRITE_SIZE, SPRITE_SIZE};
+					if (g.enemies[k].alive && SDL_HasIntersection(&a, &b))
+					{
+						// we have a hit!
+						g.shots[i].alive = g.enemies[k].alive = false;
+						g.score++;
+					}
+				}
+			}
 			else
 				g.shots[i].alive = false;
+		}
+	}
+
+	// Wave timer to decide to spawn enemies of not --
+	static int spawn_height = 100;
+	if (SDL_GetTicks() - g.wave_timer > WAVE_TIMER)
+	{
+		if (g.last_enemy == NUM_ENEMIES)
+		{
+			g.last_enemy = 0;
+			g.wave_timer = SDL_GetTicks();
+			spawn_height = SPRITE_SIZE + (g.scroll % (SCREEN_HEIGHT-SPRITE_SIZE-SPRITE_SIZE));
+		}
+		else if (g.last_enemy == 0 || g.enemies[g.last_enemy-1].x < SCREEN_WIDTH-SPRITE_SIZE)
+		{
+			g.enemies[g.last_enemy].alive = true;
+			g.enemies[g.last_enemy].x = SCREEN_WIDTH;
+			g.enemies[g.last_enemy].y = spawn_height;
+			
+			++g.last_enemy;
+		}
+	}
+	
+	// move all enemies --
+	for(int i = 0; i < NUM_ENEMIES; ++i)
+	{
+		if(g.enemies[i].alive)
+		{
+			if (g.enemies[i].x > -SPRITE_SIZE)
+			{
+				g.enemies[i].x -= ENEMY_SPEED;
+				g.enemies[i].y += SDL_sinf(g.enemies[i].x/(SCREEN_WIDTH/20)) * 4;
+				SDL_Rect a = {g.enemies[i].x, g.enemies[i].y, SPRITE_SIZE, SPRITE_SIZE};
+				SDL_Rect b = {g.ship_x, g.ship_y, SPRITE_SIZE, SPRITE_SIZE};
+				if (SDL_HasIntersection(&a, &b))
+				{
+					// we have been hit!
+					g.enemies[i].alive = false;
+					g.enemies[i].x = -100;
+					g.score--;
+				}
+			}
+			else
+				g.enemies[i].alive = false;
 		}
 	}
 }
@@ -244,6 +314,16 @@ void Draw()
 		{
 			target = { g.shots[i].x, g.shots[i].y, SPRITE_SIZE, SPRITE_SIZE };
 			SDL_RenderCopy(g.renderer, g.shot, nullptr, &target);
+		}
+	}
+
+	// Draw enemies ---
+	for(int i = 0; i < NUM_ENEMIES; ++i)
+	{
+		if(g.enemies[i].alive)
+		{
+			target = { g.enemies[i].x, g.enemies[i].y, SPRITE_SIZE, SPRITE_SIZE };
+			SDL_RenderCopy(g.renderer, g.tex_enemy, nullptr, &target);
 		}
 	}
 
