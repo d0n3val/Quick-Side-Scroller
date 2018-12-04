@@ -43,6 +43,7 @@
 #define KILL_SCORE 3
 #define WAVE_TIMER 4000u // ms between waves
 #define INTRO_TIMER 2000u // ms of invulnerability
+#define SHOT_TIMER 300u // ms between each shot
 #define INTRO_FREE_TIMER 1000u // ms of invulnerability and control for the player
 
 // Globals for tech tweaks -------------------------------------
@@ -99,7 +100,7 @@ struct globals
 	int scroll;
 	int score, max_score;
 	int frame;
-	unsigned wave_timer, intro_timer,intro_free_timer;
+	unsigned wave_timer, intro_timer, intro_free_timer, shot_timer;
 	Mix_Music* music;
 	Mix_Chunk* fx_shoot;
 	Mix_Chunk* fx_explosion;
@@ -152,7 +153,7 @@ void Start()
 	// Init other vars --
 	g.ship_x = -SPRITE_SIZE * 3;
 	g.ship_y = SCREEN_HEIGHT / 2;
-	g.wave_timer = g.intro_timer = SDL_GetTicks();
+	g.wave_timer = g.intro_timer = g.shot_timer = SDL_GetTicks();
 	g.intro_free_timer = SDL_GetTicks() + INTRO_FREE_TIMER;
 }
 
@@ -196,7 +197,7 @@ bool CheckInput()
 				case SDLK_s: g.down = (event.type == SDL_KEYDOWN); break;
 				case SDLK_a: g.left = (event.type == SDL_KEYDOWN); break;
 				case SDLK_d: g.right = (event.type == SDL_KEYDOWN); break;
-				case SDLK_SPACE: g.fire = (event.type == SDL_KEYDOWN && event.key.repeat == 0); break;
+				case SDLK_SPACE: g.fire = (event.type == SDL_KEYDOWN); break;
 				case SDLK_ESCAPE: ret = false; break;
 			}
 		}
@@ -242,7 +243,7 @@ void KillEnemy(int id)
 }
 
 // ----------------------------------------------------------------
-void MoveStuff()
+void UpdateWorld(unsigned int now)
 {
 	if (g.intro_timer == 0u && g.intro_free_timer == 0u)
 	{
@@ -255,8 +256,9 @@ void MoveStuff()
 		CAP(g.ship_x, 0, SCREEN_WIDTH - SPRITE_SIZE);
 
 		// Check if we need to spawn a new laser --
-		if(g.fire)
+		if(g.fire && (now - g.shot_timer) > SHOT_TIMER)
 		{
+			g.shot_timer = now;
 			Mix_PlayChannel(-1, g.fx_shoot, 0);
 			g.fire = false;
 
@@ -272,12 +274,11 @@ void MoveStuff()
 	else if (g.intro_timer > 0u)
 	{
 		g.ship_x += SHIP_SPEED;
-		if (SDL_GetTicks() - g.intro_timer > INTRO_TIMER)
+		if (now - g.intro_timer > INTRO_TIMER)
 			g.intro_timer = 0u;
 	}
-	else if (g.intro_free_timer > 0u && SDL_GetTicks() - g.intro_free_timer > INTRO_FREE_TIMER)
+	else if (g.intro_free_timer > 0u && now - g.intro_free_timer > INTRO_FREE_TIMER)
 		g.intro_free_timer = 0u;
-
 
 	// Move all lasers --
 	for(int i = 0; i < NUM_SHOTS; ++i)
@@ -303,7 +304,7 @@ void MoveStuff()
 
 	// Wave timer to decide to spawn enemies of not --
 	static int spawn_height = 100;
-	if (SDL_GetTicks() - g.wave_timer > WAVE_TIMER)
+	if (now - g.wave_timer > WAVE_TIMER)
 	{
 		if (g.last_enemy == NUM_ENEMIES)
 		{
@@ -346,7 +347,7 @@ void MoveStuff()
 			SpawnExplosion(g.ship_x, g.ship_y);
 			g.score = 0;
 			g.intro_timer = SDL_GetTicks();
-			g.intro_free_timer = SDL_GetTicks() + INTRO_FREE_TIMER;
+			g.intro_free_timer = now + INTRO_FREE_TIMER;
 			g.ship_x = -SPRITE_SIZE * 4;
 			g.ship_y = SCREEN_HEIGHT / 2;
 		}
@@ -448,7 +449,7 @@ int main(int argc, char* args[])
 
 	while(CheckInput())
 	{
-		MoveStuff();
+		UpdateWorld(SDL_GetTicks());
 		Draw();
 		++g.frame;
 	}
